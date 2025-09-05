@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { doc, updateDoc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, query, getDocs } from 'firebase/firestore'; // Changed import
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
+import { User, NearbyUser } from '../types';
 
 interface LocationContextType {
   userLocation: { lat: number; lng: number } | null;
-  nearbyUsers: Array<{ id: string; lat: number; lng: number; displayName?: string }>;
+  nearbyUsers: NearbyUser[];
   locationPermission: boolean;
+  locationAccuracy: number | null;
   startLocationTracking: () => void;
   stopLocationTracking: () => void;
 }
@@ -24,8 +26,9 @@ export const useLocation = () => {
 export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [nearbyUsers, setNearbyUsers] = useState<Array<{ id: string; lat: number; lng: number; displayName?: string }>>([]);
+  const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
   const [locationPermission, setLocationPermission] = useState(false);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
 
   const startLocationTracking = () => {
@@ -36,22 +39,28 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const id = navigator.geolocation.watchPosition(
       async (position) => {
-        const { latitude, longitude } = position.coords;
+        const { latitude, longitude, accuracy } = position.coords;
         const location = { lat: latitude, lng: longitude };
         
         setUserLocation(location);
+        setLocationAccuracy(accuracy);
         setLocationPermission(true);
 
-        // Update user location in Firestore
+        // Update user location in Firestore - FIXED
         if (user) {
           try {
-            await updateDoc(doc(db, 'users', user.uid), {
+            await setDoc(doc(db, 'users', user.uid), {
               location: {
                 lat: latitude,
                 lng: longitude,
-                timestamp: new Date()
-              }
-            });
+                timestamp: new Date(),
+                accuracy: accuracy
+              },
+              // You might want to add other user fields too
+              displayName: user.displayName || null,
+              email: user.email || null,
+              lastUpdated: new Date()
+            }, { merge: true }); // This is the key fix
           } catch (error) {
             console.error('Error updating location:', error);
           }
@@ -60,6 +69,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       (error) => {
         console.error('Error getting location:', error);
         setLocationPermission(false);
+        setLocationAccuracy(null);
       },
       {
         enableHighAccuracy: true,
@@ -75,10 +85,11 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (watchId) {
       navigator.geolocation.clearWatch(watchId);
       setWatchId(null);
+      setLocationAccuracy(null);
     }
   };
 
-  // Fetch nearby users (simplified - in production, use geohashing)
+  // Fetch nearby users
   useEffect(() => {
     if (!user || !userLocation) return;
 
@@ -87,19 +98,19 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const usersQuery = query(collection(db, 'users'));
         const snapshot = await getDocs(usersQuery);
         
-        const users = snapshot.docs
+        const users: NearbyUser[] = snapshot.docs
           .filter(doc => doc.id !== user.uid)
-          .map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }))
-          .filter(userData => userData.location)
-          .map(userData => ({
-            id: userData.id,
-            lat: userData.location.lat,
-            lng: userData.location.lng,
-            displayName: userData.displayName
-          }));
+          .map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              lat: data.location?.lat || 0,
+              lng: data.location?.lng || 0,
+              displayName: data.displayName,
+              lastUpdated: data.location?.timestamp
+            };
+          })
+          .filter(userData => userData.lat !== 0 && userData.lng !== 0);
         
         setNearbyUsers(users);
       } catch (error) {
@@ -114,6 +125,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     userLocation,
     nearbyUsers,
     locationPermission,
+    locationAccuracy,
     startLocationTracking,
     stopLocationTracking
   };

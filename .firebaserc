@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "ubuntu-4098f",
+    "ubuntu": "ubuntu-4098f"
+  },
+  "targets": {},
+  "etags": {}
+}

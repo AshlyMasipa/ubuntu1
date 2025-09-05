@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Phone } from 'lucide-react';
-import { doc, addDoc, collection, updateDoc } from 'firebase/firestore';
+import { doc, addDoc, collection, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from '../../contexts/LocationContext';
@@ -18,36 +18,39 @@ export const SOSButton: React.FC = () => {
     }
 
     setActivating(true);
-    
+
     try {
-      // Create SOS alert in Firestore
-      await addDoc(collection(db, 'sosAlerts'), {
+      // 1️⃣ Create SOS alert in Firestore
+      const sosRef = await addDoc(collection(db, 'sosAlerts'), {
         userId: user.uid,
+        userEmail: user.email || undefined, // Use undefined instead of 'anonymous'
         location: {
           lat: userLocation.lat,
           lng: userLocation.lng
         },
-        timestamp: new Date(),
-        status: 'active',
-        userEmail: user.email || 'anonymous'
+        timestamp: Date.now(), // Use number timestamp
+        status: 'active'
       });
 
-      // Update user status
+      // 2️⃣ Update user emergency status
       await updateDoc(doc(db, 'users', user.uid), {
         emergencyStatus: 'sos-active',
-        lastSOSTime: new Date()
+        lastSOSTime: serverTimestamp()
       });
 
       setActivated(true);
-      
-      // Auto-reset after 5 minutes
-      setTimeout(() => {
+
+      // 3️⃣ Optional: Auto-reset after 5 minutes
+      setTimeout(async () => {
         setActivated(false);
+        // Mark SOS as resolved
+        await updateDoc(sosRef, { status: 'resolved' });
+        await updateDoc(doc(db, 'users', user.uid), { emergencyStatus: 'normal' });
       }, 300000);
 
-      // Show confirmation
-      alert('SOS Alert sent! Emergency services and nearby users have been notified.');
-      
+      // 4️⃣ Show confirmation
+      alert('Nearby Users and Emergency Services have been notified.');
+
     } catch (error) {
       console.error('Error sending SOS:', error);
       alert('Failed to send SOS alert. Please try again.');
@@ -86,7 +89,7 @@ export const SOSButton: React.FC = () => {
           </>
         )}
       </button>
-      
+
       {activated && (
         <div className="absolute -top-16 right-0 bg-red-600 text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap shadow-lg">
           Emergency Alert Active

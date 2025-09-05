@@ -1,9 +1,10 @@
 import React from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LocationProvider } from './contexts/LocationContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Dashboard } from './components/Dashboard/Dashboard';
+import UnifiedChatPage from './components/Dashboard/UnifiedChatPage';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
@@ -13,20 +14,32 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading SafeTravel...</p>
+          <p className="text-gray-600">Loading Ubuntu...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return <LoginForm />;
-  }
-
   return (
-    <LocationProvider>
-      <Dashboard />
-    </LocationProvider>
+    <Routes>
+      {!user ? (
+        <Route path="*" element={<LoginForm />} />
+      ) : (
+        <>
+          <Route path="/" element={
+            <LocationProvider>
+              <Dashboard />
+            </LocationProvider>
+          } />
+          <Route path="/chat/*" element={
+            <LocationProvider>
+              <UnifiedChatPage />
+            </LocationProvider>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </>
+      )}
+    </Routes>
   );
 };
 

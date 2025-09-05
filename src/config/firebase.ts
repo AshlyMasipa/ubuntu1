@@ -5,13 +5,12 @@ import { getFunctions } from 'firebase/functions';
 import { getMessaging } from 'firebase/messaging';
 
 const firebaseConfig = {
-  // Replace with your Firebase config
-  apiKey: "your-api-key",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "your-app-id"
+  apiKey: "AIzaSyDtJjx3hjXc9kIwMm9TAWkazFeqTbquV-Y",
+  authDomain: "ubuntu-4098f.firebaseapp.com",
+  projectId: "ubuntu-4098f",
+  storageBucket: "ubuntu-4098f.firebasestorage.app",
+  messagingSenderId: "934346932914",
+  appId: "1:934346932914:web:7f2b46f5bd832537dfffab"
 };
 
 const app = initializeApp(firebaseConfig);
